@@ -1,0 +1,1 @@
+"%USERPROFILE%\AppData\Local\Google\Chrome\Application\chrome.exe" --load-and-launch-app="%~dp0\"
