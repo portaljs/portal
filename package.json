@@ -14,7 +14,7 @@
     "pg": "*",
     "mongo-sql": "*",
     "nodemailer": "0.7.1",
-    "less": "*",
+    "less": "1",
     "uglify-js": "*",
     "password-generator": "*",
     "mime": "*"
