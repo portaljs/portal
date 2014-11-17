@@ -102,7 +102,9 @@ module.exports = function (server) {
 							page = pkg.views[viewName](mergedOptions);
 						}
 					}
-					render(viewName, {});
+					render(viewName, {
+						render: render,
+					});
 				}
 			}
 			if(page) { this.redis.setex(pageKey, 172800, page); }
