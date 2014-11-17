@@ -95,16 +95,14 @@ module.exports = function (server) {
 								/* useful */ console.warn('View Not Found 404: ', pkg.paths.views + viewName + '.ejs');
 								throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url);
 							}
-							page = ejs.compile('' + fs.readFile(pkg.paths.views + viewName + '.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(mergedOptions);
+							return ejs.compile('' + fs.readFile(pkg.paths.views + viewName + '.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(mergedOptions);
 						} else {
 							if(!pkg.views[viewName]) { viewName = '/404'; }
 							if(!pkg.views[viewName]) { throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url); }
-							page = pkg.views[viewName](mergedOptions);
+							return pkg.views[viewName](mergedOptions);
 						}
 					}
-					render(viewName, {
-						render: render,
-					});
+					page = render(viewName, { render: render, });
 				}
 			}
 			if(page) { this.redis.setex(pageKey, 172800, page); }
