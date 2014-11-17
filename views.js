@@ -42,7 +42,7 @@ module.exports = function (server) {
 					server: pkg.server,
 					file: function (fileName) {
 						return pkg.files[fileName];
-					}
+					},
 				};
 			if (options.package.redirects && options.package.redirects[viewName]) {
 				redirecting = true;
@@ -84,17 +84,25 @@ module.exports = function (server) {
 					if (master) { this.redis.setex(headKey, 2592000, master); }
 				}
 				if (!page) {
-					if(DEBUG) {
-						if (!fs.exists(pkg.paths.views + viewName + '.ejs').wait()) {
-							/* useful */ console.warn('View Not Found 404: ', pkg.paths.views + viewName + '.ejs');
-							throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url);
+					const render = function (viewName, mergeOptions) {
+						const mergedOptions = Object.create(options);
+						Object.keys(Object(mergeOptions)).forEach(function (key) {
+							mergedOptions[key] = mergeOptions[key];
+						});
+						mergedOptions.options = mergedOptions;
+						if(DEBUG) {
+							if (!fs.exists(pkg.paths.views + viewName + '.ejs').wait()) {
+								/* useful */ console.warn('View Not Found 404: ', pkg.paths.views + viewName + '.ejs');
+								throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url);
+							}
+							page = ejs.compile('' + fs.readFile(pkg.paths.views + viewName + '.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(mergedOptions);
+						} else {
+							if(!pkg.views[viewName]) { viewName = '/404'; }
+							if(!pkg.views[viewName]) { throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url); }
+							page = pkg.views[viewName](mergedOptions);
 						}
-						page = ejs.compile('' + fs.readFile(pkg.paths.views + viewName + '.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(options);
-					} else {
-						if(!pkg.views[viewName]) { viewName = '/404'; }
-						if(!pkg.views[viewName]) { throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url); }
-						page = pkg.views[viewName](options);
 					}
+					render(viewName, {});
 				}
 			}
 			if(page) { this.redis.setex(pageKey, 172800, page); }
