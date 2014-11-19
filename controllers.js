@@ -1,5 +1,6 @@
 'use strict';
 const DEBUG = !!process.env.PORTAL_DEBUG,
+	PORTAL_DEBUG_CONTROLLERS = !!process.env.PORTAL_DEBUG_CONTROLLERS,
 	fiber = require('carbonfibers'),
 	ObjectId = fiber.mongo.ObjectID,
 	fs = fiber.fs,
@@ -12,7 +13,15 @@ const DEBUG = !!process.env.PORTAL_DEBUG,
 		mixins: ['base'],
 		models: [],
 		methods: []
-	};
+	},
+	colorBold = '\x1B[1m',
+	colorGrey = '\x1B[90m',
+	colorRed = '\x1B[31m',
+	colorYellow = '\x1B[33m',
+	colorWhite = '\x1B[37m',
+	colorGreen = '\x1B[32m',
+	colorCyan = '\x1B[1m\x1B[36m',
+	colorReset = '\x1B[0m';
 function dummy(object) {
 	const dummy = Object.create(object);
 	let method = '';
@@ -289,6 +298,8 @@ module.exports = function(pkg) {
 				options = require(fileName);
 			if(!options.namespace) { options.namespace = ('/' + controllerName + '/').replace(/^\/*|\/+$/g, '/'); }
 			this.controllers[options.namespace] = Controller(options);
-			//*useful*/ console.log(pkg.name + ':' + controllerName + ' loaded for namespace ' + options.namespace);
+			if (PORTAL_DEBUG_CONTROLLERS) {
+				/*useful*/ console.log(pkg.name + ':' + controllerName + ' loaded for namespace ' + options.namespace + '\n\t(' + colorYellow + Object.keys(this.controllers[options.namespace].api).join(colorReset + ', ' + colorYellow) + colorReset + ')');
+			}
 		}.bind(pkg));
 }
