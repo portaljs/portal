@@ -43,7 +43,7 @@ module.exports = function (server) {
 					file: function (fileName) {
 						return pkg.files[fileName];
 					},
-					renderStyles = function () {
+					renderStyles: function () {
 						return ((pkg.less) ? pkg.less.map(function (filename) {
 							const parser = less.Parser();
 							return fiber.wait(parser.parse.bind(parser), '' + fs.readFile(filename).wait()).toCSS({ compress: true });
