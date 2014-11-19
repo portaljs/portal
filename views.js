@@ -43,6 +43,31 @@ module.exports = function (server) {
 					file: function (fileName) {
 						return pkg.files[fileName];
 					},
+					renderStyles = function () {
+						return ((pkg.less) ? pkg.less.map(function (filename) {
+							const parser = less.Parser();
+							return fiber.wait(parser.parse.bind(parser), '' + fs.readFile(filename).wait()).toCSS({ compress: true });
+						}) : []);
+					},
+					renderScripts: function () {
+						return ((pkg.javascript) ? pkg.javascript.map(function (filename) {
+							try {
+								const file = fs.readFile(filename).wait();
+								if(/\.min\.js$/.test(filename)) { return file; }
+								const ast = uglify.parse('' + file);
+								ast.figure_out_scope();
+								return ast.transform(uglify.Compressor({
+									unsafe: true,
+									warnings: false
+								})).print_to_string();
+							} catch (error) {
+								throw new Error('Javascript Parse Error:\n'
+									+ filename + '\n'
+									+ error + '\n'
+									+ error.stack);
+							}
+						}) : []);
+					},
 				};
 			if (options.package.redirects && options.package.redirects[viewName]) {
 				redirecting = true;
@@ -53,27 +78,8 @@ module.exports = function (server) {
 			} else {
 				options.DEBUG = DEBUG;
 				if (!master && !ajaxing) {
-					options.styles = ((pkg.less) ? pkg.less.map(function (filename) {
-						const parser = less.Parser();
-						return fiber.wait(parser.parse.bind(parser), '' + fs.readFile(filename).wait()).toCSS({ compress: true });
-					}) : []);
-					options.scripts = ((pkg.javascript) ? pkg.javascript.map(function (filename) {
-						try {
-							const file = fs.readFile(filename).wait();
-							if(/\.min\.js$/.test(filename)) { return file; }
-							const ast = uglify.parse('' + file);
-							ast.figure_out_scope();
-							return ast.transform(uglify.Compressor({
-								unsafe: true,
-								warnings: false
-							})).print_to_string();
-						} catch (error) {
-							throw new Error('Javascript Parse Error:\n'
-								+ filename + '\n'
-								+ error + '\n'
-								+ error.stack);
-						}
-					}) : []);
+					options.styles = options.renderStyles();
+					options.scripts = options.renderScripts();
 					options.PAGE = '<%- PAGE %>';
 					if(DEBUG) {
 						master =  ejs.compile('' + fs.readFile(pkg.paths.views + pkg.defaultMasterPage + '.master.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(options);
