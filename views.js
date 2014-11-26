@@ -89,7 +89,7 @@ module.exports = function (server) {
 					}
 					if (master) { this.redis.setex(headKey, 2592000, master); }
 				}
-				if (!page) {
+				if (!pkg.masterOnly && !page) {
 					const render = function (viewName, mergeOptions) {
 						const mergedOptions = Object.create(options);
 						Object.keys(Object(mergeOptions)).forEach(function (key) {
