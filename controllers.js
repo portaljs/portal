@@ -8,12 +8,6 @@ const DEBUG = !!process.env.PORTAL_DEBUG,
 	hasOwn = Object.prototype.hasOwnProperty,
 	toString = Object.prototype.toString,
 	ServerError = require('./errors').ServerError,
-	baseController = {
-		namespace: '',
-		mixins: ['base'],
-		models: [],
-		methods: []
-	},
 	colorBold = '\x1B[1m',
 	colorGrey = '\x1B[90m',
 	colorRed = '\x1B[31m',
@@ -22,6 +16,79 @@ const DEBUG = !!process.env.PORTAL_DEBUG,
 	colorGreen = '\x1B[32m',
 	colorCyan = '\x1B[1m\x1B[36m',
 	colorReset = '\x1B[0m';
+function Name(string) {
+	return (('' + (string || '')).toLowerCase().replace(/\W/g, ''));
+}
+function allKeys(object) {
+	const keys = [];
+	for (let key in object) {
+		// get all keys, not just top level prototype with hasOwnProperty
+		keys.push(key);
+	}
+	return keys;
+}
+function sequence(next, fn) {
+	function sequence() {
+		return fn.apply(this,
+			(next ?
+				slice.call(next.apply(this, arguments)) :
+				arguments));
+	}
+	return sequence;
+}
+function Model(name, models, functions) {
+	let sequenceName = [];
+	function lookupModel(model) {
+		if (model instanceof Function) {
+			sequenceName.push('function');
+			return model;
+		}
+		sequenceName.push('"' + colorCyan + model + colorReset + '"');
+		if (typeof model === 'string') {
+			if (!models[model.toLowerCase()]) {
+				throw new Error(name + ' -> ' + sequenceName.join(' -> ') + 'not found in\n{ ' + allKeys(models).join(', ') + ' }');
+			}
+			let modelSequence = Model(name + ' -> ' + sequenceName.join(' -> '), models, models[model.toLowerCase()]);
+			sequenceName.push(modelSequence.sequenceName);
+			return modelSequence;
+		}
+		throw new Error(name + ' -> ' + sequenceName.join(' -> ') + 'not a function, or model name string');
+	}
+	const sequenceFn = ((Array.isArray(functions) ? functions : [functions])
+		.map(lookupModel)
+		.reduce(sequence));
+	sequenceFn.sequenceName = sequenceName.join(' -> ');
+	return sequenceFn;
+}
+function Method(name, methods, models, functions) {
+	let sequenceName = [];
+	function lookupMethod(method) {
+		if (method instanceof Function) {
+			sequenceName.push('function');
+			return method;
+		}
+		if (Array.isArray(method)) {
+			let modelSequence = Model(name + ' -> ' + sequenceName.join(' -> '), models, method);
+			sequenceName.push('[ ' + modelSequence.sequenceName + ' ]');
+			return modelSequence;
+		}
+		sequenceName.push('"' + colorCyan + method + colorReset + '"');
+		if (typeof method === 'string') {
+			if (!methods[method.toLowerCase()]) {
+				throw new Error(name + ' -> ' + sequenceName.join(' -> ') + 'not found in\n{ ' + allKeys(methods).join(', ') + ' }');
+			}
+			let methodSequence = Method(name + ' -> ' + sequenceName.join(' -> '), methods, models, methods[method.toLowerCase()]);
+			sequenceName.push(methodSequence.sequenceName);
+			return methodSequence;
+		}
+		throw new Error(name + ' -> ' + sequenceName.join(' -> ') + 'not a function, models array, or method name string');
+	}
+	const sequenceFn = ((Array.isArray(functions) ? functions : [functions])
+		.map(lookupMethod)
+		.reduce(sequence));
+	sequenceFn.sequenceName = sequenceName.join(' -> ');
+	return sequenceFn;
+}
 function dummy(object) {
 	const dummy = Object.create(object);
 	let method = '';
@@ -49,6 +116,15 @@ function isModuleNotFound(error) {
 	if (!error || error.code !== 'MODULE_NOT_FOUND') { throw error; }
 }
 module.exports = function(pkg) {
+	var baseController = {
+		mixins: ['base'],
+		models: {
+			Object: Object,
+			Array: Function.prototype.call.bind(Array.prototype.slice),
+			String: String,
+			Boolean: Boolean
+		}
+	};
 	function lookupController(directory, name) {
 		try {
 			return require(directory + name.replace(/\./g, '/') + '.controller.js');
@@ -56,40 +132,11 @@ module.exports = function(pkg) {
 			isModuleNotFound(error);
 		}
 	}
-	function Method(methods) {
-		let index = 0;
-		var debugMethods = slice.call(methods);
-		while (index < methods.length) {
-			const method = methods[index];
-			if(Array.isArray(method)) { methods[index] = validate.call(this, method, true); }
-			else if('string' === typeof method) {
-				methods[index] = this.methods[method];
-				if(!(methods[index] instanceof Function)) {
-					throw new Error('METOD NOT FOUND: ' + method + '\n' + this.namespace);
-				}
-			} else if(!(method instanceof Function)) {
-				throw new Error('INVALID METHOD TYPE: ' + (typeof method) + '\n' + this.namespace);
-			}
-			index += 1;
-		}
-		return function () {
-			let results = slice.call(arguments),
-				index = 0;
-			while (index < methods.length) {
-				results = methods[index].apply(this, results);
-				if (DEBUG && (!Array.isArray(results)
-					&& '[object Arguments]' !== toString.call(results))) {
-						throw new Error('Controller Does Not Return An Array of args. \n' + results + toString.call(results));
-				}
-				index += 1;
-			}
-			return results;
-		};
-	}
 	Controller.prototype.__proto__ = pkg;
 	function Controller(options) {
 		if (!(this instanceof Controller)) { return new Controller(options); }
-		const mixins = [];
+		const mixins = [],
+			self = this;
 		function findMixins(options) {
 			if ('string' === typeof options) {
 				options = lookupController(pkg.dirname + '/controllers/', options)
@@ -107,55 +154,57 @@ module.exports = function(pkg) {
 		findMixins(options);
 		mixins.forEach(function (options) {
 			Object.keys(options).forEach(function (propertyName) {
-				this[propertyName] = options[propertyName];
-			}.bind(this));
-		}.bind(this));
-		this.collection = this.collection || this.namespace.replace(/^\/|\/$/g, '').replace(/\//g, '_');
-		this.server = pkg.server;
-		this.package = pkg;
-		this.models = Object.create(null);
-		this.methods = Object.create(null);
-		this.api = Object.create(null);
-		if(options === baseController) {
-			this.__proto__ = pkg;
+				self[propertyName] = options[propertyName];
+			}.bind(self));
+		}.bind(self));
+		self.collection = self.collection || self.namespace.replace(/^\/|\/$/g, '').replace(/\//g, '_');
+		self.server = pkg.server;
+		self.package = pkg;
+		self.models = Object.create(null);
+		self.methods = Object.create(null);
+		self.api = Object.create(null);
+		if (options === baseController) {
+			self.__proto__ = pkg;
 		} else {
 			if ('string' === typeof options.inherits) {
 				const controllerOptions = lookupController(pkg.dirname + '/controllers/', options.inherits)
 					|| lookupController(pkg.server.dirname + '/controllers/', options.inherits)
 					|| lookupController(__dirname + '/controllers/', options.inherits);
 				if (!controllerOptions) { throw new Error('Mixin Not Found: ' + pkg.name + '/' + options.inherits); }
-				this.__proto__ = new Controller(controllerOptions);
+				self.__proto__ = new Controller(controllerOptions);
 			} else {
-				this.__proto__ = new Controller(options.inherits || baseController);
+				self.__proto__ = new Controller(options.inherits || baseController);
 			}
-			this.models.__proto__ = this.__proto__.models;
-			this.methods.__proto__ = this.__proto__.methods;
-			this.api.__proto__ = this.__proto__.api;
+			self.models.__proto__ = self.__proto__.models;
+			self.methods.__proto__ = self.__proto__.methods;
+			self.api.__proto__ = self.__proto__.api;
 		}
 		mixins.forEach(function (options) {
 			Object.keys(options.models || {}).forEach(function (modelName) {
-				this.models[modelName] = options.models[modelName];
-				this['model' + (modelName.substring(0,1)+'').toUpperCase() + modelName.substring(1)] = options.models[modelName];
-			}.bind(this));
+				self.models[modelName.toLowerCase()] = options.models[modelName];
+			});
 			Object.keys(options.methods || {}).forEach(function (methodName) {
-				// const method = options.methods[methodName];
-				// this.methods[methodName] = ((method instanceof Function) ? method :
-					// Method.bind(this)(Array.isArray(method) ? method : [method]));
-				const method = options.methods[methodName];
-				this.methods[methodName] = (Method.bind(this)(Array.isArray(method) ? method : [method]));
-				this['method' + (methodName.substring(0,1)+'').toUpperCase() + methodName.substring(1)] = method;
-			}.bind(this));
-			Object.keys(options.api || {}).forEach(function (methodName) {
-				const method = options.api[methodName];
-				this.api[methodName] = Method.bind(this)(Array.isArray(method) ? method : [method], true);
-				this['api' + (methodName.substring(0,1)+'').toUpperCase() + methodName.substring(1)] = method;
-			}.bind(this));
+				self.methods[methodName.toLowerCase()] = options.methods[methodName];
+			});
+			Object.keys(options.api || {}).forEach(function (apiName) {
+				self.api[apiName.toLowerCase()] = options.api[apiName];
+			});
+		});
+		Object.keys(self.models).forEach(function (modelName) {
+			self.models[modelName] = Model(self.package.name + '/' + self.namespace + ' models{} -> ' + modelName + ' -> ', self.models, self.models[modelName]);
+		});
+		Object.keys(self.methods).forEach(function (methodName) {
+			self.methods[methodName] = Method(self.package.name + '/' + self.namespace + ' methods{} -> ' + methodName + ' -> ', self.methods, self.models, self.methods[methodName]);
+		});
+		Object.keys(self.api).forEach(function (apiName) {
+			self.api[apiName] = Method(self.package.name + '/' + self.namespace + ' apis{} -> ' + apiName + ' -> ', self.methods, self.models, self.api[apiName]);
+		});
+		mixins.forEach(function (options) {
 			if (hasOwn.call(options, 'constructor') && options.constructor instanceof Function && options.constructor !== Object) {
-				options.constructor.call(this, options);
+				options.constructor.call(self, options);
 			}
-		}.bind(this));
+		});
 		if (this.initialization) {
-			//TODO: make inheritable:
 			this.initialization();
 		}
 		this.server.tests.push(fiber(function(callback) {
@@ -173,11 +222,12 @@ module.exports = function(pkg) {
 			}
 			testInstance.redis = dummy(testInstance.redis);
 			for (method in this.api) {
-				try{
+				try {
 					output.apply(testInstance, (this.api[method].apply(testInstance, input([]))));
 				} catch(error) {
 					if (!(error instanceof ServerError)) {
-						console.log('TEST FAIL:', pkg.name, this.namespace, method);
+						/*useful*/ console.log('TEST FAIL:', pkg.name, this.namespace, method, ' -> ', (this.api[method]||{}).sequenceName, '\n' + colorRed, error, error.stack, colorReset);
+						// console.log('TEST FAIL:', pkg.name, this.namespace, method, error, error.stack);
 						throw error;
 					}
 				}
@@ -238,57 +288,6 @@ module.exports = function(pkg) {
 		return object;
 	}
 	baseController.models.output = output;
-	function validate(models, sequence) {
-		function recursive(model) {
-			if ('string' === typeof model) {
-				if(!(this.models[model] instanceof Function)) {
-					throw new Error('MODEL NOT FOUND: ' + model + '\n' + this.namespace);
-				}
-				return this.models[model];
-			} else if (Array.isArray(model)) {
-				model = recursive.call(this, model[0]);
-				return function (array, args, index) {
-					if (!Array.isArray(array)) {
-						throw new ClientError('error:validation:array');
-					}
-					const length = array.length;
-					let arrayIndex = 0; while (arrayIndex < length) {
-						array[arrayIndex] = model.call(this, array[arrayIndex], args, index);
-						index += 1;
-					}
-					return array;
-				}
-			} else if (model && model.constructor === Object) {
-				model = Object.create(model);
-				Object.keys(model.__proto__).forEach(function (key) {
-					model[key] = recursive.call(this, model[key]);
-				});
-				return function (object, args, index) {
-					if (!object || object.constructor !== Object) {
-						throw new ClientError('error:validation:object');
-					}
-					let key; for (key in object) {
-						if (hasOwn.call(model, key)) {
-							object[key] = model[key].call(this, object[key], args, index);
-						}
-					}
-					return object;
-				}
-			} else {
-				throw new Error('Unknown model in controller api: ' + model);
-			}
-		}
-		models = models.map(recursive.bind(this));
-		return function () {
-			const args = slice.call(arguments);
-			let index = 0;
-			while (index < models.length) {
-				args[index] = models[index].call(this, args[index], args, index);
-				index += 1;
-			}
-			return args;
-		}
-	}
 	fs.readdirc(pkg.paths.controllers).wait()
 		.filter(function (filename) {
 			return /\.controller\.js$/.test(filename);
