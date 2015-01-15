@@ -17,7 +17,7 @@ const DEBUG = !!process.env.PORTAL_DEBUG,
 	colorCyan = '\x1B[1m\x1B[36m',
 	colorReset = '\x1B[0m';
 function Name(string) {
-	return (('' + (string || '')).toLowerCase().replace(/\W/g, ''));
+	return (('' + (string || '')).toLowerCase().replace(/\W|_/g, ''));
 }
 function allKeys(object) {
 	const keys = [];
@@ -57,10 +57,10 @@ function Model(name, models, functions) {
 		}
 		signature.push('"' + colorCyan + model + colorReset + '"');
 		if (typeof model === 'string') {
-			if (!models[model.toLowerCase()]) {
+			if (!models[Name(model)]) {
 				throw new Error(name + ' -> ' + signature.join(' -> ') + 'not found in\n{ ' + allKeys(models).join(', ') + ' }');
 			}
-			let modelSequence = Model(name + ' -> ' + signature.join(' -> '), models, models[model.toLowerCase()]);
+			let modelSequence = Model(name + ' -> ' + signature.join(' -> '), models, models[Name(model)]);
 			signature.push(modelSequence.signature);
 			return modelSequence;
 		}
@@ -88,10 +88,10 @@ function Method(name, methods, models, functions) {
 		}
 		signature.push('"' + colorCyan + method + colorReset + '"');
 		if (typeof method === 'string') {
-			if (!methods[method.toLowerCase()]) {
+			if (!methods[Name(method)]) {
 				throw new Error(name + ' -> ' + signature.join(' -> ') + 'not found in\n{ ' + allKeys(methods).join(', ') + ' }');
 			}
-			let methodSequence = Method(name + ' -> ' + signature.join(' -> '), methods, models, methods[method.toLowerCase()]);
+			let methodSequence = Method(name + ' -> ' + signature.join(' -> '), methods, models, methods[Name(method)]);
 			signature.push(methodSequence.signature);
 			return methodSequence;
 		}
@@ -195,10 +195,10 @@ module.exports = function(pkg) {
 		}
 		mixins.forEach(function (options) {
 			Object.keys(options.models || {}).forEach(function (modelName) {
-				self.models[modelName.toLowerCase()] = self.models[modelName] = options.models[modelName];
+				self.models[Name(modelName)] = self.models[modelName] = options.models[modelName];
 			});
 			Object.keys(options.methods || {}).forEach(function (methodName) {
-				self.methods[methodName.toLowerCase()] = self.methods[methodName] = options.methods[methodName];
+				self.methods[Name(methodName)] = self.methods[methodName] = options.methods[methodName];
 			});
 			Object.keys(options.api || {}).forEach(function (apiName) {
 				self.api[apiName.toLowerCase()] = options.api[apiName];
