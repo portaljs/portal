@@ -36,57 +36,71 @@ function sequence(next, fn) {
 	}
 	return sequence;
 }
+function ModelApplier(functions) {
+	function applier() {
+		const args = slice.call(arguments),
+			length = functions.length;
+		let index = 0; while (index < length) {
+			args[index] = functions[index].call(this, args[index]);
+			index += 1;
+		}
+		return args;
+	}
+	return applier;
+}
 function Model(name, models, functions) {
-	let sequenceName = [];
+	let signature = [];
 	function lookupModel(model) {
 		if (model instanceof Function) {
-			sequenceName.push('function');
+			signature.push('fn');
 			return model;
 		}
-		sequenceName.push('"' + colorCyan + model + colorReset + '"');
+		signature.push('"' + colorCyan + model + colorReset + '"');
 		if (typeof model === 'string') {
 			if (!models[model.toLowerCase()]) {
-				throw new Error(name + ' -> ' + sequenceName.join(' -> ') + 'not found in\n{ ' + allKeys(models).join(', ') + ' }');
+				throw new Error(name + ' -> ' + signature.join(' -> ') + 'not found in\n{ ' + allKeys(models).join(', ') + ' }');
 			}
-			let modelSequence = Model(name + ' -> ' + sequenceName.join(' -> '), models, models[model.toLowerCase()]);
-			sequenceName.push(modelSequence.sequenceName);
+			let modelSequence = Model(name + ' -> ' + signature.join(' -> '), models, models[model.toLowerCase()]);
+			signature.push(modelSequence.signature);
 			return modelSequence;
 		}
-		throw new Error(name + ' -> ' + sequenceName.join(' -> ') + 'not a function, or model name string');
+		throw new Error(name + ' -> ' + signature.join(' -> ') + 'not a function, or model name string');
 	}
 	const sequenceFn = ((Array.isArray(functions) ? functions : [functions])
 		.map(lookupModel)
 		.reduce(sequence));
-	sequenceFn.sequenceName = sequenceName.join(' -> ');
+	sequenceFn.signature = '(' + signature.join(' -> ') + ')';
 	return sequenceFn;
 }
 function Method(name, methods, models, functions) {
-	let sequenceName = [];
+	let signature = [];
 	function lookupMethod(method) {
 		if (method instanceof Function) {
-			sequenceName.push('function');
+			signature.push('fn');
 			return method;
 		}
 		if (Array.isArray(method)) {
-			let modelSequence = Model(name + ' -> ' + sequenceName.join(' -> '), models, method);
-			sequenceName.push('[ ' + modelSequence.sequenceName + ' ]');
-			return modelSequence;
+			const modelFunctions = method.map(Model.bind(this, name + ' -> ' + signature.join(' -> '), models)),
+				modelApplier = ModelApplier(modelFunctions);
+			modelApplier.signature = '[ ' + modelFunctions.map(function (fn) { return fn.signature; }).join(', ') + ' ]';
+			signature.push(modelApplier.signature);
+			return modelApplier;
 		}
-		sequenceName.push('"' + colorCyan + method + colorReset + '"');
+		signature.push('"' + colorCyan + method + colorReset + '"');
 		if (typeof method === 'string') {
 			if (!methods[method.toLowerCase()]) {
-				throw new Error(name + ' -> ' + sequenceName.join(' -> ') + 'not found in\n{ ' + allKeys(methods).join(', ') + ' }');
+				throw new Error(name + ' -> ' + signature.join(' -> ') + 'not found in\n{ ' + allKeys(methods).join(', ') + ' }');
 			}
-			let methodSequence = Method(name + ' -> ' + sequenceName.join(' -> '), methods, models, methods[method.toLowerCase()]);
-			sequenceName.push(methodSequence.sequenceName);
+			let methodSequence = Method(name + ' -> ' + signature.join(' -> '), methods, models, methods[method.toLowerCase()]);
+			signature.push(methodSequence.signature);
 			return methodSequence;
 		}
-		throw new Error(name + ' -> ' + sequenceName.join(' -> ') + 'not a function, models array, or method name string');
+		throw new Error(name + ' -> ' + signature.join(' -> ') + 'not a function, models array, or method name string');
 	}
 	const sequenceFn = ((Array.isArray(functions) ? functions : [functions])
 		.map(lookupMethod)
 		.reduce(sequence));
-	sequenceFn.sequenceName = sequenceName.join(' -> ');
+	sequenceFn.signature = '(' + signature.join(' -> ') + ')';
 	return sequenceFn;
 }
 function dummy(object) {
@@ -181,10 +195,10 @@ module.exports = function(pkg) {
 		}
 		mixins.forEach(function (options) {
 			Object.keys(options.models || {}).forEach(function (modelName) {
-				self.models[modelName.toLowerCase()] = options.models[modelName];
+				self.models[modelName.toLowerCase()] = self.models[modelName] = options.models[modelName];
 			});
 			Object.keys(options.methods || {}).forEach(function (methodName) {
-				self.methods[methodName.toLowerCase()] = options.methods[methodName];
+				self.methods[methodName.toLowerCase()] = self.methods[methodName] = options.methods[methodName];
 			});
 			Object.keys(options.api || {}).forEach(function (apiName) {
 				self.api[apiName.toLowerCase()] = options.api[apiName];
@@ -226,7 +240,7 @@ module.exports = function(pkg) {
 					output.apply(testInstance, (this.api[method].apply(testInstance, input([]))));
 				} catch(error) {
 					if (!(error instanceof ServerError)) {
-						/*useful*/ console.log('TEST FAIL:', pkg.name, this.namespace, method, ' -> ', (this.api[method]||{}).sequenceName, '\n' + colorRed, error, error.stack, colorReset);
+						/*useful*/ console.log('TEST FAIL:', pkg.name, this.namespace, method, ' -> ', (this.api[method]||{}).signature, '\n' + colorRed, error, error.stack, colorReset);
 						// console.log('TEST FAIL:', pkg.name, this.namespace, method, error, error.stack);
 						throw error;
 					}
