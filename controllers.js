@@ -64,6 +64,7 @@ function Model(name, models, functions) {
 			signature.push(modelSequence.signature);
 			return modelSequence;
 		}
+		console.log(model)
 		throw new Error(name + ' -> ' + signature.join(' -> ') + 'not a function, or model name string');
 	}
 	const sequenceFn = ((Array.isArray(functions) ? functions : [functions])
@@ -141,7 +142,7 @@ module.exports = function(pkg) {
 	};
 	function lookupController(directory, name) {
 		try {
-			return require(directory + name.replace(/\./g, '/') + '.controller.js');
+			return require(directory + name.replace(/\./g, '/') + '.controller');
 		} catch (error) {
 			isModuleNotFound(error);
 		}
@@ -304,7 +305,7 @@ module.exports = function(pkg) {
 	baseController.models.output = output;
 	fs.readdirc(pkg.paths.controllers).wait()
 		.filter(function (filename) {
-			return /\.controller\.js$/.test(filename);
+			return /\.controller\.\w+$/.test(filename);
 		})
 		.forEach(function (fileName) {
 			const controllerName = fileName.substring(pkg.paths.controllers.length),

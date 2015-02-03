@@ -41,7 +41,7 @@ module.exports = function (options) {
 				const name = filename.substring(options.path.length),
 					etag = JSON.stringify(hashFile(filename).wait());
 				let urlName = '';
-				
+
 				//// Optimize symbolic linking:
 				// if (bucketFiles.filter(function (bucketFile) {
 					// if (bucketFile.ETag === etag) {
@@ -51,7 +51,7 @@ module.exports = function (options) {
 					// }
 					// return false;
 				// }).length < 1) {
-				
+
 				urlName = prefix + name;
 				if (!bucketFiles[prefix + name] || bucketFiles[prefix + name].ETag !== etag) {
 					/* useful */ console.log('Uploading: ', name);

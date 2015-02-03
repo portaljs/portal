@@ -36,7 +36,7 @@ module.exports = function (server) {
 		this.paths.controllers = this.paths.controllers || this.dirname;
 		this.paths.files = this.paths.files || this.dirname;
 		this.paths.emails = this.paths.emails || this.dirname;
-		
+
 		if (this.database) {
 			if (this.database.redis) { this.redis = fiber.redis(this.database.redis.port, this.database.redis.host); }
 			if (this.database.mongo) { this.mongo = fiber.mongo(this.database.mongo.host + '/' + this.database.mongo.database); }
@@ -116,7 +116,7 @@ module.exports = function (server) {
 	};
 	fs.readdirc(server.dirname + '/' + server.packages).wait()
 		.filter(function (filename) {
-			return /package\.config\.js$/.test(filename);
+			return /package\.config\.\w+$/.test(filename);
 		})
 		.forEach(function (filename) {
 			const options = require(filename);
@@ -130,7 +130,7 @@ module.exports = function (server) {
 			saveKey = 'portal,packagedata,' + request.hostname,
 			xSession = request.headers['x-session'];
 		let packageData;
-		
+
 		request.session = {};
 		//fake session:
 		// request.session = {
