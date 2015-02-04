@@ -211,13 +211,13 @@ module.exports = function(pkg) {
 			});
 		});
 		Object.keys(self.models).forEach(function (modelName) {
-			self.models[modelName] = Model(self.package.name + '/' + self.namespace + ' models{} -> ' + modelName + ' -> ', self.models, self.models[modelName]);
+			self.models[modelName] = Model(self.package.name + ' ' + self.namespace + ' models{} -> ' + modelName + ' -> ', self.models, self.models[modelName]);
 		});
 		Object.keys(self.methods).forEach(function (methodName) {
-			self.methods[methodName] = Method(self.package.name + '/' + self.namespace + ' methods{} -> ' + methodName + ' -> ', self.methods, self.models, self.methods[methodName]);
+			self.methods[methodName] = Method(self.package.name + ' ' + self.namespace + ' methods{} -> ' + methodName + ' -> ', self.methods, self.models, self.methods[methodName]);
 		});
 		Object.keys(self.api).forEach(function (apiName) {
-			self.api[apiName] = Method(self.package.name + '/' + self.namespace + ' api{} -> ' + apiName + ' -> ', self.methods, self.models, self.api[apiName]);
+			self.api[apiName] = Method(self.package.name + ' ' + self.namespace + ' api{} -> ' + apiName + ' -> ', self.methods, self.models, self.api[apiName]);
 		});
 		mixins.forEach(function (options) {
 			if (hasOwn.call(options, 'constructor') && options.constructor instanceof Function && options.constructor !== Object) {
