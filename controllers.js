@@ -313,7 +313,7 @@ module.exports = function(pkg) {
 			return /\.controller\.\w+$/.test(filename);
 		})
 		.forEach(function (fileName) {
-			const controllerName = fileName.substring(pkg.paths.controllers.length),
+			const controllerName = fileName.substring(pkg.paths.controllers.length).replace(/\.controller\.\w+$/, ''),
 				options = require(fileName);
 			if(!options.namespace) { options.namespace = ('/' + controllerName + '/').replace(/^\/*|\/+$/g, '/'); }
 			this.controllers[options.namespace] = Controller(options);
