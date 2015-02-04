@@ -17,7 +17,10 @@ const DEBUG = !!process.env.PORTAL_DEBUG,
 	colorCyan = '\x1B[1m\x1B[36m',
 	colorReset = '\x1B[0m';
 function Name(string) {
-	return (('' + (string || '')).toLowerCase().replace(/\W|_/g, ''));
+	return (('' + (string || '')).toLowerCase().replace(/[^a-z0-9]/g, ''));
+}
+function PathName(string) {
+	return (('' + (string || '')).toLowerCase().replace(/[^a-z0-9\/]/g, '').replace(/\/+/g, '/'));
 }
 function allKeys(object) {
 	const keys = [];
@@ -163,6 +166,8 @@ module.exports = function(pkg) {
 				options.mixins.forEach(function (mixin) {
 					findMixins(mixin);
 				});
+			} else if (options.mixins) {
+				findMixins(options.mixins);
 			}
 			mixins.push(options);
 		}
@@ -202,7 +207,7 @@ module.exports = function(pkg) {
 				self.methods[Name(methodName)] = self.methods[methodName] = options.methods[methodName];
 			});
 			Object.keys(options.api || {}).forEach(function (apiName) {
-				self.api[apiName.toLowerCase()] = options.api[apiName];
+				self.api[PathName(apiName)] = options.api[apiName];
 			});
 		});
 		Object.keys(self.models).forEach(function (modelName) {
@@ -212,7 +217,7 @@ module.exports = function(pkg) {
 			self.methods[methodName] = Method(self.package.name + '/' + self.namespace + ' methods{} -> ' + methodName + ' -> ', self.methods, self.models, self.methods[methodName]);
 		});
 		Object.keys(self.api).forEach(function (apiName) {
-			self.api[apiName] = Method(self.package.name + '/' + self.namespace + ' apis{} -> ' + apiName + ' -> ', self.methods, self.models, self.api[apiName]);
+			self.api[apiName] = Method(self.package.name + '/' + self.namespace + ' api{} -> ' + apiName + ' -> ', self.methods, self.models, self.api[apiName]);
 		});
 		mixins.forEach(function (options) {
 			if (hasOwn.call(options, 'constructor') && options.constructor instanceof Function && options.constructor !== Object) {
