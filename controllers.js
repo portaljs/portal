@@ -254,6 +254,18 @@ module.exports = function(pkg) {
 			}
 		}.bind(this)).fork());
 	}
+	Controller.prototype.get = get;
+	function get(name) {
+		const
+			path = PathName(name),
+			name = Name(name);
+		return (
+			this.api[path] ||
+			this.methods[name] ||
+			this.models[name] ||
+			this[name] ||
+			function () {}).bind(this);
+	}
 	function input(object) {
 		var i, key, copy, array;
 		if (object && ('object' === typeof object)) {
@@ -322,3 +334,5 @@ module.exports = function(pkg) {
 			}
 		}.bind(pkg));
 }
+module.exports.Name = Name;
+module.exports.PathName = PathName;
