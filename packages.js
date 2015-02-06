@@ -7,6 +7,7 @@ const fiber = require('carbonfibers'),
 	files = require('./files'),
 	ses = require('./ses'),
 	controllers = require('./controllers'),
+	PathName = controllers.PathName,
 	ServerError = errors.ServerError,
 	ClientError = errors.ClientError;
 module.exports = function (server) {
@@ -83,9 +84,10 @@ module.exports = function (server) {
 			Object.keys(this.controllers || {}).length + ' Controllers\n');
 	}
 	Package.prototype.controll = function (request, response) {
-		const controller = this.controllers[request.url.replace(/\/[^\/]+$/, '/')],
-			methodName = request.url.replace(/^.*\//, ''),
-			lastIndex = request.url.lastIndexOf('/');
+		const url = PathName(request.url);
+			controller = this.controllers[url.replace(/\/[^\/]+$/, '/')],
+			methodName = url.replace(/^.*\//, ''),
+			lastIndex = url.lastIndexOf('/');
 		if (!controller) { throw new ClientError('error:notfound:404'); }
 		const method = controller.api[methodName];
 		if (!method) { throw new ClientError('error:notfound:404'); }
@@ -112,7 +114,7 @@ module.exports = function (server) {
 		if (controllerInstance.xSessionKey) {
 			response.setHeader('X-Session', controllerInstance.xSessionKey);
 		}
-		response.end(JSON.stringify([('success' + request.url.substring(lastIndex) + request.url.substring(0, lastIndex)).replace(/\//g, ':')].concat(result)));
+		response.end(JSON.stringify([('success' + url.substring(lastIndex) + url.substring(0, lastIndex)).replace(/\//g, ':')].concat(result)));
 	};
 	fs.readdirc(server.dirname + '/' + server.packages).wait()
 		.filter(function (filename) {
