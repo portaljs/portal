@@ -84,7 +84,7 @@ module.exports = function (server) {
 			Object.keys(this.controllers || {}).length + ' Controllers\n');
 	}
 	Package.prototype.controll = function (request, response) {
-		const url = PathName(request.url);
+		const url = PathName(request.url),
 			controller = this.controllers[url.replace(/\/[^\/]+$/, '/')],
 			methodName = url.replace(/^.*\//, ''),
 			lastIndex = url.lastIndexOf('/');
