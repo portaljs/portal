@@ -257,8 +257,8 @@ module.exports = function(pkg) {
 	Controller.prototype.get = get;
 	function get(name) {
 		const
-			path = PathName(name),
-			name = Name(name);
+			path = PathName(name);
+		name = Name(name);
 		return (
 			this.api[path] ||
 			this.methods[name] ||
