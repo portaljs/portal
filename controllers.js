@@ -224,6 +224,17 @@ module.exports = function(pkg) {
 				options.constructor.call(self, options);
 			}
 		});
+		this.get = function (name) {
+			const
+				path = PathName(name);
+			name = Name(name);
+			return (
+				this.api[path] ||
+				this.methods[name] ||
+				this.models[name] ||
+				this[name] ||
+				function () {}).bind(this);
+		}
 		if (this.initialization) {
 			this.initialization();
 		}
@@ -253,18 +264,6 @@ module.exports = function(pkg) {
 				}
 			}
 		}.bind(this)).fork());
-	}
-	Controller.prototype.get = get;
-	function get(name) {
-		const
-			path = PathName(name);
-		name = Name(name);
-		return (
-			this.api[path] ||
-			this.methods[name] ||
-			this.models[name] ||
-			this[name] ||
-			function () {}).bind(this);
 	}
 	function input(object) {
 		var i, key, copy, array;
