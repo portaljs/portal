@@ -7,7 +7,8 @@ const DEBUG = process.env.PORTAL_DEBUG,
 	uglify = require('uglify-js'),
 	mongo = fiber.mongo,
 	fs = fiber.fs,
-	ejs = fiber.ejs;
+	ejs = fiber.ejs,
+	PathName = require('./controllers').PathName;
 module.exports = function (server) {
 	{
 		const keys = server.redis.keys('portal,pagecache,*').wait();
@@ -69,46 +70,60 @@ module.exports = function (server) {
 						}) : []);
 					},
 				};
-			if (options.package.redirects && options.package.redirects[viewName]) {
-				redirecting = true;
-				page = JSON.stringify(['redirect']
-					.concat(Array.isArray(options.package.redirects[viewName])
-						? options.package.redirects[viewName]
-						: [options.package.redirects[viewName]]));
-			} else {
-				options.DEBUG = DEBUG;
-				if (!master && !ajaxing) {
-					options.styles = options.renderStyles();
-					options.scripts = options.renderScripts();
-					options.PAGE = '<%- PAGE %>';
-					if(DEBUG) {
-						master =  ejs.compile('' + fs.readFile(pkg.paths.views + pkg.defaultMasterPage + '.master.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(options);
-					} else {
-						if(!pkg.views[pkg.defaultMasterPage + '.master']) { throw new Error('Master Page Does Not Exist In Package: ' + pkg.name + '! ' + pkg.defaultMasterPage); }
-						master = pkg.views[pkg.defaultMasterPage + '.master'](options);
-					}
-					if (master) { this.redis.setex(headKey, 2592000, master); }
+			if (options.package.redirector) {
+				const redirect = this.db.get('redirects').findOne({
+						host: this.host,
+						url: PathName(decodeURIComponent(request.url))
+					}).wait();
+				if (redirect) {
+					redirecting = true;
+					page = JSON.stringify(['redirect']
+						.concat(Array.isArray(redirect.data) ?
+							redirect.data : [redirect.data]));
 				}
-				if (!pkg.masterOnly && !page) {
-					const render = function (viewName, mergeOptions) {
-						const mergedOptions = Object.create(options);
-						Object.keys(Object(mergeOptions)).forEach(function (key) {
-							mergedOptions[key] = mergeOptions[key];
-						});
-						mergedOptions.options = mergedOptions;
+			}
+			if (!redirecting) {
+				if (options.package.redirects && options.package.redirects[viewName]) {
+					redirecting = true;
+					page = JSON.stringify(['redirect']
+						.concat(Array.isArray(options.package.redirects[viewName])
+							? options.package.redirects[viewName]
+							: [options.package.redirects[viewName]]));
+				} else {
+					options.DEBUG = DEBUG;
+					if (!master && !ajaxing) {
+						options.styles = options.renderStyles();
+						options.scripts = options.renderScripts();
+						options.PAGE = '<%- PAGE %>';
 						if(DEBUG) {
-							if (!fs.exists(pkg.paths.views + viewName + '.ejs').wait()) {
-								/* useful */ console.warn('View Not Found 404: ', pkg.paths.views + viewName + '.ejs');
-								throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url);
-							}
-							return ejs.compile('' + fs.readFile(pkg.paths.views + viewName + '.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(mergedOptions);
+							master =  ejs.compile('' + fs.readFile(pkg.paths.views + pkg.defaultMasterPage + '.master.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(options);
 						} else {
-							if(!pkg.views[viewName]) { viewName = '/404'; }
-							if(!pkg.views[viewName]) { throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url); }
-							return pkg.views[viewName](mergedOptions);
+							if(!pkg.views[pkg.defaultMasterPage + '.master']) { throw new Error('Master Page Does Not Exist In Package: ' + pkg.name + '! ' + pkg.defaultMasterPage); }
+							master = pkg.views[pkg.defaultMasterPage + '.master'](options);
 						}
+						if (master) { this.redis.setex(headKey, 2592000, master); }
 					}
-					page = render(viewName, { render: render, });
+					if (!pkg.masterOnly && !page) {
+						const render = function (viewName, mergeOptions) {
+							const mergedOptions = Object.create(options);
+							Object.keys(Object(mergeOptions)).forEach(function (key) {
+								mergedOptions[key] = mergeOptions[key];
+							});
+							mergedOptions.options = mergedOptions;
+							if(DEBUG) {
+								if (!fs.exists(pkg.paths.views + viewName + '.ejs').wait()) {
+									/* useful */ console.warn('View Not Found 404: ', pkg.paths.views + viewName + '.ejs');
+									throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url);
+								}
+								return ejs.compile('' + fs.readFile(pkg.paths.views + viewName + '.ejs').wait(), { compileDebug: true, open:'<%%', close: '%%>' })(mergedOptions);
+							} else {
+								if(!pkg.views[viewName]) { viewName = '/404'; }
+								if(!pkg.views[viewName]) { throw new Error('404 Page Does Not Exist In Package: ' + pkg.name + '! ' + request.url); }
+								return pkg.views[viewName](mergedOptions);
+							}
+						}
+						page = render(viewName, { render: render, });
+					}
 				}
 			}
 			if(page) { this.redis.setex(pageKey, 172800, page); }
