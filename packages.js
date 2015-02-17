@@ -94,17 +94,19 @@ module.exports = function (server) {
 		const controllerInstance = Object.create(controller);
 		controllerInstance.package = this;
 		controllerInstance.session = request.session;
-		controllerInstance.session.agent = request.headers['user-agent'];
-		controllerInstance.session.ip = request.connection.remoteAddress;
-		controllerInstance.host = request.headers.host || '';
-		controllerInstance.session.permissions = (this.defaultPermissions || []).reduce(function (obj, permission) {
-			obj[permission] = 32503701600000;
-			return obj;
-		}, {});
-		if(controllerInstance.session.user) {
-			Object.keys(controllerInstance.session.user._permissions || {}).forEach(function(permission) {
-				controllerInstance.session.permissions[permission] = controllerInstance.session.user._permissions[permission];
-			});
+		if (this.legacySessions) {
+			controllerInstance.session.agent = request.headers['user-agent'];
+			controllerInstance.session.ip = request.connection.remoteAddress;
+			controllerInstance.host = request.headers.host || '';
+			controllerInstance.session.permissions = (this.defaultPermissions || []).reduce(function (obj, permission) {
+				obj[permission] = 32503701600000;
+				return obj;
+			}, {});
+			if (controllerInstance.session.user) {
+				Object.keys(controllerInstance.session.user._permissions || {}).forEach(function(permission) {
+					controllerInstance.session.permissions[permission] = controllerInstance.session.user._permissions[permission];
+				});
+			}
 		}
 		controllerInstance.originalArguments = request.body;
 		const result = controllerInstance.models.output.call(controllerInstance,
