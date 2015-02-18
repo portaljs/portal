@@ -236,7 +236,7 @@ module.exports = function(pkg) {
 				function () {}).bind(this);
 		}
 		this.call = function (name) {
-			this.get(name).apply(this, slice.call(arguments, 1))
+			return this.get(name).apply(this, slice.call(arguments, 1))
 		}
 		if (this.initialization) {
 			this.initialization();
