@@ -180,9 +180,9 @@ module.exports = function(pkg) {
 		self.collection = self.collection || self.namespace.replace(/^\/|\/$/g, '').replace(/\//g, '_');
 		self.server = pkg.server;
 		self.package = pkg;
-		self.models = Object.create(null);
-		self.methods = Object.create(null);
-		self.api = Object.create(null);
+		self.models = {};
+		self.methods = {};
+		self.api = {};
 		if (options === baseController) {
 			self.__proto__ = pkg;
 		} else {
