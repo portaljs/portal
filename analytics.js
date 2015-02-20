@@ -1,122 +1,107 @@
-'use strict';
-const hasOwn = Object.prototype.hasOwnProperty,
-	tests = [{
-		total: /^/
-	}, {
-		mobile: /android|mobile|phone|pad|pod|tab/i,
-		desktop: /^/
-	}, {
-		opera: /opera/i,
-		firefox: /firefox/i,
-		chrome: /chrom/i,
-		ie: /trident/i,
-		oldie: /msie/i,
-		safari: /safari/i,
-		unknown: /^/
-	}, {
-		android: /android/i,
-		linux: /linux|ubuntu/i,
-		windows: /windows/i,
-		ios: /ip(hone|ad|od)|ios/i,
-		osx: /os\s?x|mac/i,
-		other: /^/
-	}],
-	last = {
-		minutes: 0,
-		hours: 0,
-		days: 0,
-	};
-module.exports = function (server) {
-	function index(collection) {
-		collection.index('_created', { unique: true });
-		tests.forEach(function (nameTable) {
-			Object.keys(nameTable).forEach(function (indexName) {
-				collection.index(indexName, { sparse: true });
-			});
-		});
-	}
-	server.db.analytics = server.db.get('analytics');
-	server.db.analytics.index('_created');
-	tests.forEach(function (nameTable) {
-		Object.keys(nameTable).forEach(function (indexName) {
-			server.db.analytics.index('_analytics.' + indexName, { sparse: true });
-		});
-	});
-	server.db.analytics_minutes = server.db.get('analytics_minutes');
-	index(server.db.analytics_minutes);
-	server.db.analytics_hours = server.db.get('analytics_hours');
-	index(server.db.analytics_hours);
-	server.db.analytics_days = server.db.get('analytics_days');
-	index(server.db.analytics_days);
-	
-	return function (request, response) {
-		response.on('finish', function () {
-			const socket = request.connection,
-				analytics = {
-					_id: server.db.oid(),
-					_created: Date.now(),
-					_url: request.url,
-					_remoteAddress: socket.remoteAddress,
-					_timestamp: request.timestamp,
-					_length: Date.now() - request.timestamp,
-					_bytesRead: socket.bytesRead,
-					_bytesWritten: socket.bytesWritten,
-					_analytics: {},
-					user_agent: ''
-				};
-			Object.keys(request.headers).forEach(function (header) {
-				analytics[(''+header).replace(/\W+/g,'_').replace(/^_+/,'').toLowerCase()] = request.headers[header];
-			});
-			tests.forEach(function (tests) {
-				const keys = Object.keys(tests);
-				let index = 0
-				while (index < keys.length) {
-					if (tests[keys[index]].test(analytics.user_agent)) {
-						analytics._analytics[keys[index]] = 1;
-						break;
-					}
-					index += 1;
-				}
-			});
-			if (request.method === 'GET') {
-				analytics._analytics.get = 1;
-			}
-			if (request.method === 'POST') {
-				analytics._analytics.post = 1;
-			}
-			analytics._analytics
-			if (request.session && request.session.user && request.session.user._id) {
-				analytics._userId = request.session.user._id;
-			}
-			request.emit('analytics', analytics);
-			server.redis.publish('portal:analytics', JSON.stringify(analytics));
-			server.db.analytics.insert(analytics);
-			
-			function hit(interval, datetime) {
-				const collection = server.db['analytics_' + interval];
-				collection
-					.update({ _created: datetime }, { $inc: analytics._analytics })
-					.on('success', function (count) {
-						if (count < 1) {
-							var data = JSON.parse(JSON.stringify(analytics._analytics));
-							data._created = datetime;
-							data._updated = datetime;
-							collection.insert(data)
-								.on('error', function () {
-									// Edge case if another instance created first:
-									collection.update({ _created: datetime }, { $inc: analytics._analytics });
-								});
-						}
-					});
-			}
-			let date = new Date();
-			date.setUTCMilliseconds(0);
-			date.setUTCSeconds(0);
-			hit('minutes', +date);
-			date.setUTCMinutes(0);
-			hit('hours', +date);
-			date.setUTCHours(0);
-			hit('days', +date);
-		}.bind(this));
-	};
+var agents, querystring,
+  __hasProp = {}.hasOwnProperty;
+
+querystring = require('querystring');
+
+agents = [[['total', /^/]], [['mobile', /android|mobile|phone|pad|pod|tab/i], ['desktop', /^/]], [['opera', /opera/i], ['firefox', /firefox/i], ['chrome', /chrom/i], ['ie', /trident/i], ['oldie', /msie/i], ['safari', /safari/i], ['unknown', /^/]], [['android', /android/i], ['linux', /linux|ubuntu/i], ['windows', /windows/i], ['ios', /iphone|ipad|ipod|ios/i], ['osx', /os\s?x|mac/i], ['other', /^/]]];
+
+module.exports = function(server) {
+  var interval, setIndexes, _i, _len, _ref;
+  setIndexes = function(collectionName, prefix) {
+    var catagory, collection, test, _i, _j, _len, _len1;
+    collection = server.db[collectionName] = server.db.get(collectionName);
+    collection.index('_created');
+    for (_i = 0, _len = agents.length; _i < _len; _i++) {
+      catagory = agents[_i];
+      for (_j = 0, _len1 = catagory.length; _j < _len1; _j++) {
+        test = catagory[_j];
+        collection.index("" + prefix + test[0], {
+          sparse: true
+        });
+      }
+    }
+    return collection.index('_query.id', {
+      sparse: true
+    });
+  };
+  setIndexes('analytics', '_data.');
+  _ref = ['minutes', 'hours', 'days'];
+  for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+    interval = _ref[_i];
+    setIndexes('analytics_' + interval, '');
+  }
+  return function(request, response) {
+    var date, headers, host, method, query, url;
+    headers = request.headers || {};
+    method = request.method;
+    host = headers.host || '';
+    url = decodeURIComponent("" + (request.url || ''));
+    query = querystring.parse(("" + request.url).replace(/^.*\?|^.+$/, ''));
+    date = new Date;
+    return response.on('finish', function() {
+      var analytics, catagory, header, hit, socket, test, _j, _k, _len1, _len2, _ref1, _ref2;
+      socket = request.connection;
+      analytics = {
+        _id: server.db.oid(),
+        _created: +date,
+        _updated: Date.now(),
+        _method: method,
+        host: host,
+        _url: url,
+        _query: query,
+        _data: {},
+        _remoteAddress: socket.remoteAddress,
+        _length: Date.now() - request.timestamp,
+        _bytesRead: socket.bytesRead,
+        _bytesWritten: socket.bytesWritten,
+        _userId: (_ref1 = request.session) != null ? (_ref2 = _ref1.user) != null ? _ref2._id : void 0 : void 0,
+        user_agent: ''
+      };
+      for (header in headers) {
+        if (!__hasProp.call(headers, header)) continue;
+        analytics[header.replace(/[\W_]+/g, '_')] = headers[header];
+      }
+      for (_j = 0, _len1 = agents.length; _j < _len1; _j++) {
+        catagory = agents[_j];
+        for (_k = 0, _len2 = catagory.length; _k < _len2; _k++) {
+          test = catagory[_k];
+          if (test[1].test(analytics.user_agent)) {
+            analytics._data[test[0]] = 1;
+            break;
+          }
+        }
+      }
+      request.emit('analytics', analytics);
+      server.redis.publish('portal:analytics', JSON.stringify(analytics));
+      server.db.analytics.insert(analytics);
+      hit = function(interval, datetime) {
+        var collection;
+        collection = server.db['analytics_' + interval];
+        return collection.update({
+          _created: datetime,
+          method: method,
+          host: host,
+          url: url
+        }, {
+          $setOnInsert: {
+            _created: datetime,
+            method: method,
+            host: host,
+            url: url,
+            query: query
+          },
+          $inc: analytics._data
+        }, {
+          upsert: true
+        });
+      };
+      date.setUTCMilliseconds(0);
+      date.setUTCSeconds(0);
+      hit('minutes', +date);
+      date.setUTCMinutes(0);
+      hit('hours', +date);
+      date.setUTCHours(0);
+      return hit('days', +date);
+    });
+  };
 };
