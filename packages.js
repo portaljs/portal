@@ -1,5 +1,6 @@
 'use strict';
-const fiber = require('carbonfibers'),
+const DEBUG = !!process.env.PORTAL_DEBUG,
+	fiber = require('carbonfibers'),
 	fs = fiber.fs,
 	ejs = fiber.ejs,
 	errors = require('./errors'),
@@ -10,6 +11,11 @@ const fiber = require('carbonfibers'),
 	PathName = controllers.PathName,
 	ServerError = errors.ServerError,
 	ClientError = errors.ClientError;
+function sleep(timeout, callback) {
+	setTimeout(function () {
+		callback();
+	}, timeout|0);
+}
 module.exports = function (server) {
 	server.db.packages = server.db.get('packages');
 	server.db.packages.index('_created');
@@ -84,6 +90,9 @@ module.exports = function (server) {
 			Object.keys(this.controllers || {}).length + ' Controllers\n');
 	}
 	Package.prototype.controll = function (request, response) {
+		if (DEBUG && process.env.DELAY) {
+			fiber.wait(sleep, process.env.DELAY);
+		}
 		const url = PathName(decodeURIComponent(request.url)),
 			controller = this.controllers[url.replace(/\/[^\/]+$/, '/')],
 			methodName = url.replace(/^.*\//, ''),
